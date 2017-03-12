@@ -51,7 +51,7 @@ class XBRLParser(object):
         self.precision = precision
 
     @classmethod
-    def parse(self, file_handle):
+    def parse(self, file_handle, is_text=False):
         """
         parse is the main entry point for an XBRLParser. It takes a file
         handle.
@@ -60,16 +60,19 @@ class XBRLParser(object):
         xbrl_obj = XBRL()
 
         # if no file handle was given create our own
-        if not hasattr(file_handle, 'read'):
-            file_handler = open(file_handle)
-        else:
-            file_handler = file_handle
+        if not hasattr(file_handle, 'read') and not is_text:
+            file_handle = open(file_handle)
+
+        file_handler = file_handle
 
         # Store the headers
-        xbrl_file = XBRLPreprocessedFile(file_handler)
+        xbrl_file = XBRLPreprocessedFile(file_handler, is_text)
 
         xbrl = soup_maker(xbrl_file.fh)
-        file_handler.close()
+
+        if not is_text:
+            file_handler.close()
+
         xbrl_base = xbrl.find(name=re.compile("xbrl*:*"))
 
         if xbrl.find('xbrl') is None and xbrl_base is None:
@@ -742,13 +745,16 @@ class XBRLParser(object):
 # Preprocessing to fix broken XML
 # TODO - Run tests to see if other XML processing errors can occur
 class XBRLPreprocessedFile(XBRLFile):
-    def __init__(self, fh):
+    def __init__(self, fh, is_text=False):
         super(XBRLPreprocessedFile, self).__init__(fh)
 
         if self.fh is None:
             return
 
-        xbrl_string = self.fh.read()
+        if is_text:
+            xbrl_string = self.fh
+        else:
+            xbrl_string = self.fh.read()
 
         # find all closing tags as hints
         closing_tags = [t.upper() for t in re.findall(r'(?i)</([a-z0-9_\.]+)>',
